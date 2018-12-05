@@ -1,0 +1,45 @@
+n appfb.com
+a
+push cs
+pop ds
+mov si, 82
+lodsb
+cmp al, 20 ;' '
+jne 105
+mov byte [si-1], 0
+mov dx, 82
+mov al, 01
+mov ah, 3D
+int 21
+jc 14E
+mov bx, ax
+mov al, 02
+xor cx, cx
+xor dx, dx
+mov ah, 42
+int 21
+jc 14E
+xor al, al
+mov cl, [si]
+inc si
+cmp cl, 0D
+je 13B
+mov dl, 0A
+mul dl
+add al, cl
+sub al, 30
+jmp 129
+mov [150], al
+mov cx, 1
+mov dx, 150
+mov ah, 40
+int 21
+jc 14E
+mov ah, 3E
+int 21
+int 20
+
+r cx
+151
+w
+q

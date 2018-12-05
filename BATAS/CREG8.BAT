@@ -1,0 +1,9 @@
+IF x%1==xAL SET REG=0
+IF x%1==xCL SET REG=1
+IF x%1==xDL SET REG=2
+IF x%1==xBL SET REG=3
+IF x%1==xAH SET REG=4
+IF x%1==xCH SET REG=5
+IF x%1==xDH SET REG=6
+IF x%1==xBH SET REG=7
+

@@ -1,0 +1,9 @@
+IF x%1==xAX SET REG=0
+IF x%1==xCX SET REG=1
+IF x%1==xDX SET REG=2
+IF x%1==xBX SET REG=3
+IF x%1==xSP SET REG=4
+IF x%1==xBP SET REG=5
+IF x%1==xSI SET REG=6
+IF x%1==xDI SET REG=7
+

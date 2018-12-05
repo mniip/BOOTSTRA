@@ -1,0 +1,101 @@
+n rpn.com
+a
+push cs
+pop ds
+xor ch, ch
+mov cl, [80]
+mov si, 81
+lodsb
+cmp al, 30 ;'0'
+jl 125
+cmp al, 39 ;'9'
+ja 125
+sub al, 30
+xor ah, ah
+mov di, ax
+pop ax
+mov dx, 0A
+mul dx
+add ax, di
+push ax
+jmp 179
+cmp al, 5F ;'_'
+jne 12E
+xor ax, ax
+push ax
+jmp 179
+cmp al, 2B ;'+'
+jne 139
+pop ax
+pop dx
+add ax, dx
+push ax
+jmp 179
+cmp al, 2D ;'-'
+jne 144
+pop ax
+pop dx
+sub dx, ax
+push dx
+jmp 179
+cmp al, 2A ;'*' 
+jne 14F
+pop ax
+pop dx
+mul dx
+push ax
+jmp 179
+cmp al, 2F ;'/'
+jne 15C
+pop di
+pop ax
+xor dx, dx
+div di
+push ax
+jmp 179
+cmp al, 23 ;'#'
+jne 169
+pop di
+pop ax
+xor dx, dx
+div di
+push dx
+jmp 179
+cmp al, 3F ;'?'
+jne 179
+pop ax
+pop dx
+xor di, di
+cmp dx, ax
+jna 176
+inc di
+push di
+jmp 179
+loop 10B
+pop ax
+mov cx, FFFF
+push cx
+xor dx, dx
+mov cx, 0A
+div cx
+push dx
+test ax, ax
+jnz 180
+mov di, 1B1
+pop ax
+cmp ax, ffff
+je 19A
+add al, 30 ;'0'
+stosb
+jmp 18F
+mov byte [di], 24 ;'$'
+mov dx, 1A6
+mov ah, 09
+int 21
+int 20
+ 
+e 1A6 "SET RESULT=_____$"
+r cx
+B7
+w
+q

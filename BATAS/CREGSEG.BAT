@@ -1,0 +1,4 @@
+IF x%1==xES SET REG=0
+IF x%1==xCS SET REG=1
+IF x%1==xSS SET REG=2
+IF x%1==xDS SET REG=3
