@@ -11,3 +11,6 @@ are no labels. One has to manually adjust jump and variable locations.
 
 I've somewhat overcome this by writing a 8086 assembler in MSDOS batch, as seen
 under the BATAS directory.
+
+There is currently ongoing work more sophisticated tools that are soon to
+appear in this repository.
