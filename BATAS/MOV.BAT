@@ -60,7 +60,7 @@ IF x%2==xBYTE GOTO :R8IMM
 IF x%1x%2==xALx[WORD] GOTO :ALADDR
 CALL ISMRM8 %2
 IF %RESULT%==1 GOTO :R8MRM
-ECHO Expected immediate or ModR/M in second operand (IP=%IP)
+ECHO Expected immediate or ModR/M in second operand (IP=%IP%)
 
 :R8IMM
 CALL RPN! _%IP%_2+
