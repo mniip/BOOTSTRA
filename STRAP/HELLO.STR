@@ -1,0 +1,41 @@
+# This is the entry point of the program:
+# Create a stack frame with no variables for the main function
+:0 {
+  $string  # push the string (defined below)
+  puts     # call the puts function (defined below)
+} # Reaching this point will perform a return to address 0
+  # which safely terminates the program
+ 
+# Define an ASCIIZ string:
+:string [
+  'H'e'l'l'o',' 'w'o'r'l'd'!
+  0x0D 0x0A # CR LF
+  0         # NUL terminator
+] 
+
+# Define a function 'puts'
+:puts :0 {
+  $; # Consume one argument
+  # Loop while the top of the stack doesn't point to a NUL terminator
+  $@ { , $- } {
+    # Read a byte and invoke putchar on it
+    , $- putchar .
+    # Increment the address
+    1 +
+  }
+}
+
+# 'putchar' is a function but it is defined using _inline machine code_
+# the function looks at the value of the top of the stack (but doesn't
+# pop it) and outputs it as a single character to the screen, using the
+# DOS interrupt 0x21, AH=2
+:putchar [
+        0x55           # PUSH BP
+        0x8B 0xEC      # MOV BP, SP
+        0x8A 0x56 0x04 # MOV DL, [BP+4]
+        0xB4 0x02      # MOV AH, 2
+        0xCD 0x21      # INT 0x21
+        0x8B 0xE5      # MOV SP, BP
+        0x5D           # POP BP
+        0xC3           # RET
+]

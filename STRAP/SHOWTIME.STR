@@ -1,0 +1,46 @@
+:0 {
+	gettime
+	putdd
+	': putchar .
+	putdd
+	': putchar .
+	putdd
+	'. putchar .
+	putdd
+	0x0D putchar .
+	0x0A putchar .
+}
+
+:putdd :0 { $;
+	,
+	10 / '0 + putchar .
+	10 % '0 + putchar .
+}
+
+:putchar [
+	0x55           # PUSH BP
+	0x8B 0xEC      # MOV BP, SP
+	0x8A 0x56 0x04 # MOV DL, [BP+4]
+	0xB4 0x02      # MOV AH, 2
+	0xCD 0x21      # INT 0x21
+	0x8B 0xE5      # MOV SP, BP
+	0x5D           # POP BP
+	0xC3           # RET
+]
+
+:gettime [
+	0xB4 0x2C      # MOV AH, 0x2C
+	0xCD 0x21      # INT 0x21
+	0x5B           # POP BX
+	0x32 0xE4      # XOR AH, AH
+	0x8A 0xC2      # MOV AL, DL
+	0x50           # PUSH AX
+	0x8A 0xC6      # MOV AL, DH
+	0x50           # PUSH AX
+	0x8A 0xC1      # MOV AL, CL
+	0x50           # PUSH AX
+	0x8A 0xC5      # MOV AL, DH
+	0x50           # PUSH AX
+	0x53           # PUSH BX
+	0xC3           # RET
+]
