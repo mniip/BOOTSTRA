@@ -1,3 +1,9 @@
+REM  Strap compiler in 8086 assembly (BATAS dialect).
+REM  We run over the input file twice: first to calculate the addresses of all
+REM  labels, second to actually emit all the bytes in a single pass.
+REM  While we don't adhere to a specific calling convention, we try to
+REM  callee-preserve as many registers as possible.
+
 CALL PUSH CS
 CALL POP DS
 CALL PUSH CS
@@ -6,7 +12,9 @@ CALL CLL %MAIN%
 CALL INT 32
 
 CALL LABEL PANICMSG
+REM       P  a  n   i   c  $
   CALL DB 80 97 110 105 99 36
+REM  Display error message and quit
 CALL LABEL PANIC
   CALL PUSH CS
   CALL POP DS
@@ -14,6 +22,8 @@ CALL LABEL PANIC
   CALL MOV AH BYTE 9
   CALL INT 33
   CALL INT 32
+REM  Conditional jumps only have 8-bit displacement so if we'd like to panic
+REM  on carry, we have call one of these trampolines.
 CALL LABEL JC_PANIC
   CALL JC %PANIC%
   CALL RET
@@ -21,8 +31,12 @@ CALL LABEL JE_PANIC
   CALL JE %PANIC%
   CALL RET
 
+REM  This is a simplistic sequential allocator with no way to free memory
+REM  The memory comes from the area between the executable code (HEAPSTART is
+REM  defined at the very end of the executable) and the stack.
 CALL LABEL HEAPPTR
   CALL DW 0%HEAPSTART%
+REM  Number of bytes in AX. Returns offset against CS in AX.
 CALL LABEL ALLOC
   CALL PUSH CX
   CALL MOV CX [WORD] %HEAPPTR%
@@ -31,6 +45,7 @@ CALL LABEL ALLOC
   CALL POP CX
   CALL RET
 
+REM  String pointer in AX. Returns pointer to copy in AX.
 CALL LABEL STRDUP
   CALL PUSH CX
   CALL PUSH SI
@@ -51,17 +66,21 @@ CALL LABEL STRDUP
   CALL POP CX
   CALL RET
 
+REM  Global variables containing file handles for the input and output files.
 CALL LABEL IN_HANDLE
   CALL DW 0
 CALL LABEL OUT_HANDLE
   CALL DW 0
 
+REM  Are we just calculating offsets (0) or actually emitting bytes (1)?
 CALL LABEL EMIT_MODE
   CALL DB 0
+REM  Current value of the Instruction Pointer. In COM this starts at 0x100.
 CALL LABEL CUR_IP
   CALL DW 0
 CALL LABEL BUFFER
   CALL DB 0
+REM  Emit (depending on EMIT_MODE) a single byte in AL to the output handle.
 CALL LABEL EMIT_BYTE
   CALL INC BYTE [WORD] %CUR_IP%
   CALL CMP [WORD] %EMIT_MODE% BYTE 0
@@ -83,12 +102,14 @@ CALL LABEL EMIT_BYTE
   CALL POP AX
   CALL LABEL EMIT_BYTE_SKIP
   CALL RET
+REM  Emit a word in AX.
 CALL LABEL EMIT_WORD
   CALL CLL %EMIT_BYTE%
   CALL XCHG AL AH
   CALL CLL %EMIT_BYTE%
   CALL XCHG AL AH
   CALL RET
+REM  Emit an array. Pointer to beginning in AX, byte size in CX.
 CALL LABEL EMIT_ARRAY
   CALL PUSH AX
   CALL PUSH CX
@@ -108,10 +129,13 @@ CALL LABEL EMIT_ARRAY
   CALL POP AX
   CALL RET
 
+REM  A function to read a single character from the input handle with support 
+REM  for "unreading" a character once.
 CALL LABEL UNPEEKED
   CALL DB 0
 CALL LABEL IS_UNPEEKED
   CALL DB 0
+REM  Returns the character in AL.
 CALL LABEL PEEK
   CALL CMP [WORD] %IS_UNPEEKED% BYTE 0
   CALL JE %PEEK_READ%
@@ -136,6 +160,7 @@ CALL LABEL PEEK
   CALL MOV AL [WORD] %BUFFER%
   CALL CBW
   CALL RET
+REM  The character is in AL.
 CALL LABEL UNPEEK
   CALL CMP [WORD] %IS_UNPEEKED% BYTE 1
   CALL CLL %JE_PANIC%
@@ -143,6 +168,8 @@ CALL LABEL UNPEEK
   CALL MOV [WORD] %IS_UNPEEKED% BYTE 1
   CALL RET
 
+REM  Read a proper number (decimal or hexadecimal) from the input handle.
+REM  Returns the number in AX.
 CALL LABEL READ_NUM
   CALL PUSH CX
   CALL PUSH DX
@@ -212,6 +239,7 @@ CALL LABEL READ_NUM
   CALL POP CX
   CALL RET
 
+REM  Checks whether AL is an identifier character. Sets CF if so.
 CALL LABEL IS_IDENT
   CALL CMP AL BYTE 95
   CALL JE %IS_IDENT_YES%
@@ -234,11 +262,16 @@ CALL LABEL IS_IDENT
   CALL STC
   CALL RET
 
+REM  Token type is either an ASCII code or one of these constants:
 CALL EQU TK_NUM 256
 CALL EQU TK_IDENT 257
 
+REM  If the token was a number, this is where its numeric value would be
+REM  stored.
 CALL LABEL TOKEN_NUM
   CALL DW 0
+REM  If the token was an identifier, this is where its characters would be
+REM  stored. Currently a fixed buffer of 128 bytes.
 CALL LABEL TOKEN_STR
   CALL DW 0 0 0 0 0 0 0 0
   CALL DW 0 0 0 0 0 0 0 0
@@ -248,6 +281,8 @@ CALL LABEL TOKEN_STR
   CALL DW 0 0 0 0 0 0 0 0
   CALL DW 0 0 0 0 0 0 0 0
   CALL DW 0 0 0 0 0 0 0 0
+REM  Read a token from the input handle, returning the type in AX, with more
+REM  information possibly in TOKEN_NUM or TOKEN_STR.
 CALL LABEL READ_TOKEN
   CALL CLL %PEEK%
   CALL CMP AL BYTE 9
@@ -306,8 +341,13 @@ CALL LABEL READ_TOKEN
   CALL LABEL READ_TOKEN_SYM
   CALL RET
 
+REM  A singly linked list of labels. A label is a 3-word structure, where the
+REM  first word is the "next" pointer, the second word is a pointer to the
+REM  copied string that is the identifier's name, and the third word is the 
+REM  address the label points to.
 CALL LABEL LABELS
   CALL DW 0
+REM  Label name (to be copied) in AX. Address in BX.
 CALL LABEL ADD_LABEL
   CALL PUSH AX
   CALL PUSH DI
@@ -325,6 +365,8 @@ CALL LABEL ADD_LABEL
   CALL POP AX
   CALL RET
 
+REM  Find a label whose name matches that in AX. Returns the address in AX.
+REM  If not found, returns 0 in AX and sets CF.
 CALL LABEL FIND_LABEL
   CALL PUSH DX
   CALL PUSH BX
@@ -365,8 +407,12 @@ CALL LABEL FIND_LABEL
   CALL STC
   CALL RET
 
+REM  An "ilabel" is a compiler-generated label that is indexed by a number and
+REM  not a string. It has the same 3-word structure but the second word is the
+REM  index.
 CALL LABEL ILABELS
   CALL DW 0
+REM  Index in AX, address in BX.
 CALL LABEL ADD_ILABEL
   CALL PUSH AX
   CALL PUSH DI
@@ -383,6 +429,8 @@ CALL LABEL ADD_ILABEL
   CALL POP AX
   CALL RET
 
+REM  Index in AX. Returns address in AX. If not found, returns 0 in AX and
+REM  sets CF.
 CALL LABEL FIND_ILABEL
   CALL PUSH DX
   CALL PUSH BX
@@ -412,13 +460,18 @@ CALL LABEL FIND_ILABEL
   CALL STC
   CALL RET
 
+REM  This number is reset between passes so indices from the first pass
+REM  exactly coincide with indices from the second pass.
 CALL LABEL CUR_INDEX
   CALL DW 0
+REM  Returns the new index in AX.
 CALL LABEL NEXT_INDEX
   CALL MOV AX [WORD] %CUR_INDEX%
   CALL INC WORD [WORD] %CUR_INDEX%
   CALL RET
 
+REM  Parse an opened data block from the input handle, until EOF or closing
+REM  bracket is encountered.
 CALL LABEL READ_DATA_BLK
   CALL PUSH AX
   CALL PUSH CX
@@ -481,6 +534,8 @@ CALL LABEL READ_DATA_BLK
   CALL CLL %EMIT_WORD%
   CALL JMP %READ_DATA_LOOP%
 
+REM  Parse an opened text block from the input handle, until EOF or closing
+REM  brace is encountered.
 CALL LABEL READ_TEXT_BLK
   CALL PUSH AX
   CALL PUSH CX
@@ -624,6 +679,8 @@ CALL LABEL NOT_ARR
 CALL EQU NOT_SZ 4
 
 CALL LABEL READ_COMMON
+REM  This function is too long for 8-bit displacements so the "jumptable" has
+REM  to be split into two pieces: READ_C1 and READ_C2.
   CALL JMP NEAR %READ_C1%
 
   CALL LABEL READ_C_MOD
@@ -868,7 +925,9 @@ CALL LABEL COND_ARR
 CALL EQU COND_SZ 4
 
 CALL LABEL READ_COMMON_DLR
-  CALL JMP NEAR %READ_D1%
+REM  Not quite as severe as in READ_COMMON, but we still have to place the
+REM  jumptable in the middle of the branches.
+  CALL JMP NEAR %READ_D%
 
   CALL LABEL READ_D_SKIP
   CALL CLL %READ_TOKEN%
@@ -926,7 +985,7 @@ CALL LABEL READ_COMMON_DLR
   CALL CLL %EMIT_ARRAY%
   CALL RET
 
-  CALL LABEL READ_D1
+  CALL LABEL READ_D
   CALL CMP AX BTW 36
   CALL JE %READ_D_SKIP%
   CALL CMP AX BTW 42
@@ -1041,6 +1100,7 @@ CALL LABEL IN_NAME_PTR
 CALL LABEL OUT_NAME_PTR
   CALL DW 0
 CALL LABEL MAIN
+REM  Separate two arguments by spaces.
   CALL MOV SI WORD 130
   CALL MOV [WORD] %IN_NAME_PTR% SI
   CALL LABEL MAIN_PARSE_IN
@@ -1059,19 +1119,15 @@ CALL LABEL MAIN
   CALL JNE %MAIN_PARSE_OUT%
   CALL MOV [SI+BYTE] 65535 BYTE 0
 
+REM  Create or truncate the output file.
   CALL MOV DX [WORD] %OUT_NAME_PTR%
   CALL XOR CX CX
   CALL MOV AH BYTE 60
   CALL INT 33
   CALL CLL %JC_PANIC%
-
-  CALL MOV DX [WORD] %OUT_NAME_PTR%
-  CALL MOV AL BYTE 1
-  CALL MOV AH BYTE 61
-  CALL INT 33
-  CALL CLL %JC_PANIC%
   CALL MOV [WORD] %OUT_HANDLE% AX
                                   
+REM  Open the input file.
   CALL MOV DX [WORD] %IN_NAME_PTR%
   CALL XOR AL AL
   CALL MOV AH BYTE 61
@@ -1079,11 +1135,13 @@ CALL LABEL MAIN
   CALL CLL %JC_PANIC%
   CALL MOV [WORD] %IN_HANDLE% AX
 
+REM  Do the first pass to calculate the addresses of all the labels.
   CALL MOV [WORD] %EMIT_MODE% BYTE 0 
   CALL MOV [WORD] %CUR_IP% WORD 256
   CALL MOV [WORD] %CUR_INDEX% WORD 0
   CALL CLL %READ_DATA_BLK%
 
+REM  Rewind the file to the beginning.
   CALL MOV BX [WORD] %IN_HANDLE%
   CALL XOR AL AL
   CALL XOR CX CX 
@@ -1092,16 +1150,19 @@ CALL LABEL MAIN
   CALL INT 33
   CALL CLL %JC_PANIC%
 
+REM  Do the second pass to emit all the bytes.
   CALL MOV [WORD] %EMIT_MODE% BYTE 1
   CALL MOV [WORD] %CUR_IP% WORD 256
   CALL MOV [WORD] %CUR_INDEX% WORD 0
   CALL CLL %READ_DATA_BLK%
 
+REM  Close the input file.
   CALL MOV BX [WORD] %IN_HANDLE%
   CALL MOV AH BYTE 62
   CALL INT 33
   CALL CLL %JC_PANIC%
 
+REM  Close the output file.
   CALL MOV BX [WORD] %OUT_HANDLE%
   CALL MOV AH BYTE 62
   CALL INT 33

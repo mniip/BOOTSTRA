@@ -4,7 +4,14 @@ STRAP
 STRAP is a programming language designed to be a middle ground between
 assembly and a C-like language, borrowing some ideas from Forth and FALSE.
 
-Provided here is a STRAP compiler that produces standalone COM files.
+Provided here is a STRAP compiler that produces standalone COM files. It is
+written in BatAs assembly and can be compiled by running MAKE.BAT. Note that
+this process might take multiple tens of seconds.
+
+Usage
+=====
+
+    STRAP <Input.str> <Output.com>
 
 Language
 ========
@@ -73,8 +80,8 @@ generated machine code is as follows:
    to by that number.
  * A `@=` followed by a number pops a value from the stack into the local
    variable referred to by that number.
- * A `$` followed by a number pushes a from the previous stack frame, counting 
-   that many elements from the top.
+ * A `$` followed by a number pushes a value from the previous stack frame,
+   counting that many elements from the top.
  * `$:` moves the zeroth local variable to the top of the previous stack
    frame, shifting the indices of other local variables down by one. This
    effectively returns `@0` from the function.
