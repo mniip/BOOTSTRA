@@ -4,9 +4,12 @@ STRAP
 STRAP is a programming language designed to be a middle ground between
 assembly and a C-like language, borrowing some ideas from Forth and FALSE.
 
-Provided here is a STRAP compiler that produces standalone COM files. It is
-written in BatAs assembly and can be compiled by running MAKE.BAT. Note that
-this process might take multiple tens of seconds.
+In the STRAP.S file you'll find a STRAP compiler that produces standalone COM 
+files. It is written in BatAs assembly. 
+
+In the STRAP.STR file you'll find a STRAP compiler written in STRAP itself. It
+also produces standalone COM files. You can compile both of them by running
+MAKE.BAT. Note that this process might take multiple tens of seconds.
 
 Usage
 =====
