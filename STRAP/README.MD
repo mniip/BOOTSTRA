@@ -121,10 +121,10 @@ generated machine code is as follows:
 
  * `$-` pops an address and pushes a zero-extended byte read from that
    address.
- * `$+` pops a value and an address and writes the least significant byte of
+ * `$+` pops an address and a value and writes the least significant byte of
    the value at that address.
  * `$*` pops an address and pushes a 16-bit word read from that address.
- * `$/` pops a value and an address and writes the 16-bit word at that
+ * `$/` pops an address and a value and and writes the 16-bit word at that
    address.
 
 Program
