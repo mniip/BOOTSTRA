@@ -4,17 +4,16 @@
 
 @main
 
-# Display the panic message and terminate the program.
-:panic [
-        0x0E            # PUSH CS
-        0x1F            # POP DS
-        0xBA $panic_msg # MOV DX, panic_msg
-        0xB4 0x09       # MOV AH, 9
-        0xCD 0x21       # INT 0x21
-:exit
+# Terminate the program.
+:exit [
         0xCD 0x20       # INT 20
 ]
-:panic_msg [ 'P'a'n'i'c'$ ]
+
+:file_error :0 {
+        $str_file_error puts
+        put_nl
+        exit
+}
 
 # This is a simplistic sequential allocator with no way to free memory
 # The memory comes from the area between the executable code (heap_start is
@@ -62,6 +61,10 @@
 # Are we just calculating offsets (0) or actually emitting bytes (1)?
 :emit_mode [ 0 ]
 
+# Current position in the file.
+:cur_line [ $0 ]
+:cur_column [ $0 ]
+
 # Current value of the Instruction Pointer. In COM this starts at 0x100.
 :cur_ip [ $0 ]
 
@@ -71,12 +74,12 @@
         0x5A           # POP DX
         0x33 0xC9      # XOR CX, CX
         0xB4 0x3C      # MOV AH, 0x3C
+        0x33 0xFF      # XOR DI, DI
         0xCD 0x21      # INT 0x21
-        0x50           # PUSH AX
-        0x33 0xC0      # XOR AX, AX
         0x72 0x01      # JC error
-        0x40           # INC AX
+        0x47           # INC DI
         0x50           # error: PUSH AX
+        0x57           # XOR AX, AX
         0x53           # PUSH BX
         0xC3           # RET
 ]
@@ -87,12 +90,12 @@
         0x5A           # POP DX
         0x32 0xC0      # XOR AL, AL
         0xB4 0x3D      # MOV AH, 0x3D
+        0x33 0xFF      # XOR DI, DI
         0xCD 0x21      # INT 0x21
-        0x50           # PUSH AX
-        0x33 0xC0      # XOR AX, AX
         0x72 0x01      # JC error
-        0x40           # INC AX
+        0x47           # INC DI
         0x50           # error: PUSH AX
+        0x57           # PUSH DI
         0x53           # PUSH BX
         0xC3           # RET
 ]
@@ -105,11 +108,11 @@
         0x33 0xC9      # XOR CX, CX
         0x33 0xD2      # XOR DX, DX
         0xB4 0x42      # MOV AH, 0x42
+        0x33 0xFF      # XOR DI, DI
         0xCD 0x21      # INT 0x21
-        0x33 0xC0      # XOR AX, AX
         0x72 0x01      # JC error
-        0x40           # INC AX
-        0x50           # PUSH AX
+        0x47           # INC DI
+        0x57           # error: PUSH DI
         0x56           # PUSH SI
         0xC3           # RET
 ]
@@ -119,11 +122,11 @@
         0x5E           # POP SI
         0x5B           # POP BX
         0xB4 0x3E      # MOV AH, 0x3E
+        0x33 0xFF      # XOR DI, DI
         0xCD 0x21      # INT 0x21
-        0x33 0xC0      # XOR AX, AX
         0x72 0x01      # JC error
-        0x40           # INC AX
-        0x50           # error: PUSH AX
+        0x47           # INC DI
+        0x57           # error: PUSH DI
         0x56           # PUSH SI
         0xC3           # RET
 ]
@@ -139,7 +142,7 @@
         0xB4 0x40      # MOV AH, 0x40
         0xCD 0x21      # INT 0x21
         0x73 0x02      # JNC over
-        @panic         # jmp panic
+        @file_error    # jmp file_error
         0x56           # over: PUSH SI
         0xC3           # RET
 ]
@@ -154,7 +157,7 @@
         0xB4 0x3F      # MOV AH, 0x3F
         0xCD 0x21      # INT 0x21
         0x73 0x02      # JNC over
-        @panic         # jmp panic
+        @file_error    # JMP file_error
         0x30 0xE4      # XOR AH, AH
         0xA0 $buffer   # MOV AL, [buffer]
         0x50           # PUSH AX
@@ -193,12 +196,19 @@
         } {
                 $in_handle $/ read_byte
         }
+        @0 0x0A = $? {
+                0 $cur_column $*
+                $cur_line $/ 1 + $cur_line $*
+        } {
+                $cur_column $/ 1 + $cur_column $*
+        }
         $:
 }
 # Pops the unread character
 :unpeek :0 { $;
         $unpeeked $+
         1 $is_unpeeked $+
+        $cur_column $/ 1 - $cur_column $*
 }
 
 # Read a proper number (decimal or hexadecimal) from the input handle.
@@ -325,7 +335,7 @@
         }
         $:
 }
-f
+
 # A singly linked list of labels. A label is a 3-word structure, where the
 # first word is the "next" pointer, the second word is a pointer to the copied 
 # string that is the identifier's name, and the third word is the address the 
@@ -334,6 +344,20 @@ f
 
 # Pops the address and the name of the label.
 :add_label :0 { $; $;
+        $labels $/
+        $@ { @2 } {
+                @0 @2 2 + $/ strcmp $? {} {
+                        $emit_mode $- $? {} {
+                                put_location
+                                $str_redef_label puts
+                                @0 puts
+                                put_nl
+                        }
+                }
+                @2 $/ @=2
+        }
+        .
+
         6 alloc
         $labels $/ @2 $*
         @0 strdup @2 2 + $*
@@ -353,6 +377,12 @@ f
                         @1 4 + $/
                 }
         } {
+                $emit_mode $- $? {
+                        put_location
+                        $str_undef_label puts
+                        @0 puts
+                        put_nl
+                } {}
                 0
         }
         @=0 $:
@@ -425,7 +455,12 @@ f
                 @0 257 = $? {
                         $token_str find_label emit_word
                 } {
-                        @0 0 = @0 '] = | $? { panic } {}
+                        @0 0 = @0 '] = | $? {
+                                put_location
+                                $str_dollar_eob puts
+                                put_nl
+                                exit
+                        } {}
                         read_common_dollar
                 }
         }
@@ -463,7 +498,12 @@ f
                 $token_str find_label emit_word  #         <id>
                 0x50 emit_byte                   # PUSH AX
         } {
-                @0 0 = @0 '] = | $? { panic } {}
+                @0 0 = @0 '] = | $? {
+                        put_location
+                        $str_dollar_eob puts
+                        put_nl
+                        exit
+                } {}
                 @0 read_common_dollar
         }
 
@@ -607,7 +647,13 @@ f
 
         $char_arrs
         $@ { @1 $- @0 = 1 ^ } {
-                @1 $- $? {} { panic }
+                @1 $- $? {} {
+                        put_location
+                        $str_unknown_cmd puts
+                        @0 putchar
+                        put_nl
+                        @read_common_end
+                }
                 @1 5 + @=1
         }
         @1 1 + $/ @1 3 + $/ emit_array
@@ -621,13 +667,23 @@ f
                 $frame_pro_arr $frame_pro_arr_end emit_array
                 $token_num $/ 2 * emit_byte
                 read_token
-                @1 '{ = $? {} { panic }
+                @1 '{ = $? {} {
+                        put_location
+                        $str_frame_unknown puts
+                        put_nl
+                        exit
+                }
                 read_text_block
                 $frame_epi_arr $frame_epi_arr_end emit_array
         } {
                 @0 257 = $? {
                         $token_str $cur_ip $/ add_label
-                } { panic }
+                } {
+                        put_location
+                        $str_colon_unknown puts
+                        put_nl
+                        exit
+                }
         }
 }
 
@@ -635,23 +691,34 @@ f
         read_token
         @0 '= = $? {
                 read_token
-                @1 256 = $? {} { panic }
+                @1 256 = $? {} {
+                        put_location
+                        $str_toloc_unknown puts
+                        put_nl
+                        exit
+                }
                 0x8F emit_byte                 #
                 0x46 emit_byte                 # POP [BP-<offset>]
                 $token_num $/ ~ 2 * emit_byte  #
-        } {
-                @0 256 = $? {
-                        0xFF emit_byte                 #
-                        0x76 emit_byte                 # PUSH [BP-<offset>]
-                        $token_num $/ ~ 2 * emit_byte  #
-                } {
-                        @0 257 = $? {
-                                0xE9 emit_byte              #
-                                $token_str find_label       # JMP <id>
-                                $cur_ip $/ - 2 - emit_word  #
-                        } { panic }
-                }
-        }
+                @read_common_at_end
+        } {}
+        @0 256 = $? {
+                0xFF emit_byte                 #
+                0x76 emit_byte                 # PUSH [BP-<offset>]
+                $token_num $/ ~ 2 * emit_byte  #
+                @read_common_at_end
+        } {}
+        @0 257 = $? {
+                0xE9 emit_byte              #
+                $token_str find_label       # JMP <id>
+                $cur_ip $/ - 2 - emit_word  #
+                @read_common_at_end
+        } {}
+        put_location
+        $str_at_unknown puts 
+        put_nl
+        exit
+        :read_common_at_end
 }
 
 :write_word_arr [ 
@@ -708,11 +775,15 @@ f
 :read_common_dollar :0 { $;
         @0 '$ = $? {
                 read_token
-                @1 '{ = $? {} { panic }
+                @1 '{ = $? {} {
+                        put_location
+                        $str_skip_unknown puts
+                        put_nl
+                        exit
+                }
                 next_index
                 0xE9 emit_byte  # JMP label1
-                @2 find_ilabel  #
-                $cur_ip $/ - 2 - emit_word
+                @2 find_ilabel $str_skip calc_disp8 emit_byte
                 read_text_block
                 @2 $cur_ip $/ add_ilabel  # label1:
                 @read_common_dollar_end
@@ -728,7 +799,13 @@ f
 
         $dollar_char_arrs
         $@ { @1 $- @0 = 1 ^ } {
-                @1 $- $? {} { panic }
+                @1 $- $? {} {
+                        put_location
+                        $str_dollar_unknown_cmd puts
+                        @0 putchar
+                        put_nl
+                        @read_common_dollar_end
+                }
                 @1 5 + @=1
         }
         @1 1 + $/ @1 3 + $/ emit_array
@@ -738,37 +815,53 @@ f
 
 :read_if :0 {
         read_token
-        @0 '{ = $? {} { panic }
+        @0 '{ = $? {} {
+                put_location
+                $str_if_unknown1 puts
+                put_nl
+                exit
+        }
         next_index next_index
         $cond_arr $cond_arr_end emit_array
-        @1 find_ilabel
-        $cur_ip $/ - 1 - emit_byte  # ... label1
+        @1 find_ilabel $str_if calc_disp8 emit_byte # ... label1
         read_text_block
-        0xEB emit_byte              #
-        @2 find_ilabel              # jmp label2
-        $cur_ip $/ - 1 - emit_byte  #
-        @1 $cur_ip $/ add_ilabel    # :label1
+        0xEB emit_byte              # jmp label2
+        @2 find_ilabel $str_if calc_disp8 emit_byte
+        @1 $cur_ip $/ add_ilabel    # label1:
         read_token
-        @3 '{ = $? {} { panic }
+        @3 '{ = $? {} {
+                put_location
+                $str_if_unknown2 puts
+                put_nl
+                exit
+        }
         read_text_block
-        @2 $cur_ip $/ add_ilabel    # :label2
+        @2 $cur_ip $/ add_ilabel    # label2:
 }
 
 :read_while :0 {
         read_token
-        @0 '{ = $? {} { panic }
+        @0 '{ = $? {} { 
+                put_location
+                $str_while_unknown1 puts
+                put_nl
+                exit
+        }
         next_index next_index
-        @1 $cur_ip $/ add_ilabel    # :label1
+        @1 $cur_ip $/ add_ilabel    # label1:
         read_text_block
         $cond_arr $cond_arr_end emit_array
-        @2 find_ilabel              #
-        $cur_ip $/ - 1 - emit_byte  # ... label2
+        @2 find_ilabel $str_while calc_disp8 emit_byte # ... label2
         read_token
-        @3 '{ = $? {} { panic }
+        @3 '{ = $? {} {
+                put_location
+                $str_while_unknown2 puts
+                put_nl
+                exit
+        }
         read_text_block
-        0xEB emit_byte              #
-        @1 find_ilabel              # jmp label1
-        $cur_ip $/ - 1 - emit_byte  #
+        0xEB emit_byte              # jmp label1
+        @1 find_ilabel $str_while calc_disp8 emit_byte
         @2 $cur_ip $/ add_ilabel    # :label2
 }
 
@@ -779,15 +872,24 @@ f
         # Parse arguments
         0x81
         $@ { @0 $- '  = } { @0 1 + @=0 }
-        @0 $- 0x0D = $? { panic } {}
+        @0 $- 0x0D = $? {
+                $str_usage puts
+                exit
+        } {}
         @0 $in_name_ptr $*
         $@ { @0 $- '  = 1 ^ } {
-                @0 $- 0x0D = $? { panic } {}
+                @0 $- 0x0D = $? {
+                        $str_usage puts
+                        exit
+                } {}
                 @0 1 + @=0
         }
         0 @0 $+ @0 1 + @=0
         $@ { @0 $- '  = } { @0 1 + @=0 }
-        @0 $- 0x0D = $? { panic } {}
+        @0 $- 0x0D = $? {
+                $str_usage puts
+                exit
+        } {}
         @0 $out_name_ptr $*
         $@ { @0 $- '  = @0 $- 0x0D = | 1 ^ } {
                 @0 1 + @=0
@@ -795,29 +897,139 @@ f
         0 @0 $+ @0 1 + @=0
         
         $out_name_ptr $/ creat_file
-        $? { $out_handle $* } { panic }
+        $? { $out_handle $* } { file_error }
         $in_name_ptr $/ open_file
-        $? { $in_handle $* } { panic }
+        $? { $in_handle $* } { file_error }
        
         0 $emit_mode $+
+        1 $cur_line $*
+        1 $cur_column $*
         0x100 $cur_ip $*
         0 $cur_index $*
         read_data_block
 
         $in_handle $/ rewind_file
-        $? {} { panic }
+        $? {} { file_error }
 
         1 $emit_mode $+
+        1 $cur_line $*
+        1 $cur_column $*
         0x100 $cur_ip $*
         0 $cur_index $*
         read_data_block
 
         $out_handle $/ close_file
-        $? {} { panic }
+        $? {} { file_error }
         $in_handle $/ close_file
-        $? {} { panic }
+        $? {} { file_error }
 
         exit
 }
+
+:putchar [
+        0x5B           # POP BX
+        0x5A           # POP DX
+        0xB4 0x02      # MOV AH, 2
+        0xCD 0x21      # INT 0x21
+        0x53           # PUSH BX
+        0xC3           # RET
+]
+
+:put_nl :0 {
+        0x0A putchar
+        0x0D putchar
+}
+
+:puts :0 { $;
+        $@ { @0 $- } {
+                @0 $- putchar
+                @0 1 + @=0
+        }
+}
+
+:hex_digits [ '0'1'2'3'4'5'6'7'8'9'A'B'C'D'E'F ] 
+
+:put_hex8 :0 { $;
+        '0 putchar
+        'x putchar
+        @0 0x10 / 0x10 % $hex_digits + $- putchar
+        @0 0x10 % $hex_digits + $- putchar
+}
+
+:put_hex16 :0 { $;
+        '0 putchar
+        'x putchar
+        @0 0x1000 / $hex_digits + $- putchar
+        @0 0x100 / 0x10 % $hex_digits + $- putchar
+        @0 0x10 / 0x10 % $hex_digits + $- putchar
+        @0 0x10 % $hex_digits + $- putchar
+}
+
+:put_dec :0 { $;
+        @0 10000 < $? {} { @0 10000 / $hex_digits + $- putchar }
+        @0 1000 < $? {} { @0 1000 / 10 % $hex_digits + $- putchar }
+        @0 100 < $? {} { @0 100 / 10 % $hex_digits + $- putchar }
+        @0 10 < $? {} { @0 10 / 10 % $hex_digits + $- putchar }
+        @0 10 % $hex_digits + $- putchar
+}
+
+:str_counting [ '('c'o'u'n't'i'n'g') 0 ]
+:str_emitting [ '('e'm'i't't'i'n'g') 0 ]
+:put_location :0 {
+        $in_name_ptr $/ puts
+        ': putchar
+        $cur_line $/ put_dec
+        ': putchar
+        $cur_column $/ put_dec
+        '  putchar
+        $emit_mode $- $? { $str_emitting } { $str_counting } puts
+        ': putchar
+        '  putchar
+}
+
+:str_skip [ '$'$ 0 ]
+:str_if [ '$'? 0 ]
+:str_while [ '$'@ 0 ]
+:str_check1 [ ' 'b'l'o'c'k' 'i's' 't'o'o' 'l'a'r'g'e',' 'j'u'm'p
+        ' 't'a'r'g'e't'  0 ]
+:str_check2 [ ' 'i's' 't'o'o' 'f'a'r' 'f'r'o'm' 's'o'u'r'c'e'  0 ]
+:calc_disp8 :0 { $; $;
+        @0 $cur_ip $/ 1 + -
+        $emit_mode $- $? {
+                @2 0x80 < 0xFF7F @2 < | $? {} {
+                        put_location
+                        @1 puts
+                        $str_check1 puts
+                        @0 put_hex16
+                        $str_check2 puts
+                        $cur_ip $/ 1 + put_hex16
+                        put_nl
+                }
+        } {}
+        @=0 $:
+}
+
+:str_usage [ 'U's'a'g'e':' 'S'T'R'A'P' '<'I'n'p'u't'.'s't'r'>
+        ' '<'O'u't'p'u't'.'c'o'm'> 0x0D 0x0A 0 ]
+
+:str_file_error [ 'F'i'l'e' 'e'r'r'o'r 0 ]
+
+:str_undef_label [ 'u'n'd'e'f'i'n'e'd' 'l'a'b'e'l':'  0 ]
+:str_redef_label [ 'r'e'd'e'f'i'n'e'd' 'l'a'b'e'l':'  0 ]
+:str_dollar_eob [ '$' 'f'o'l'l'o'w'e'd' 'b'y' 'e'n'd' 'o'f' 'b'l'o'c'k 0 ]
+:str_unknown_cmd [ 'u'n'k'n'o'w'n' 'c'o'm'm'a'n'd':'  0 ]
+:str_frame_unknown [ ':'<'n'u'm'b'e'r'>' 'n'o't' 'f'o'l'l'o'w'e'd
+        ' 'b'y' '{ 0 ]
+:str_colon_unknown [ ':' 'n'o't' 'f'o'l'l'o'w'e'd' 'b'y' 'n'u'm'b'e'r' 'o'r
+        ' 'i'd'e'n't'i'f'i'e'r 0 ]
+:str_toloc_unknown [ '@'=' 'n'o't' 'f'o'l'l'o'w'e'd' 'b'y' 'n'u'm'b'e'r 0 ]
+:str_at_unknown [ '@' 'n'o't' 'f'o'l'l'o'w'e'd' 'b'y' 'n'u'm'b'e'r',
+        ' 'i'd'e'n't'i'f'i'e'r',' 'o'r' '= 0 ]
+:str_skip_unknown [ '$'$' 'n'o't' 'f'o'l'l'o'w'e'd' 'b'y' '{ 0 ]
+:str_if_unknown1 [ '$'?' 'n'o't' 'f'o'l'l'o'w'e'd' 'b'y' '{ 0 ]
+:str_if_unknown2 [ '$'?'{'}' 'n'o't' 'f'o'l'l'o'w'e'd' 'b'y' '{ 0 ]
+:str_while_unknown1 [ '$'@' 'n'o't' 'f'o'l'l'o'w'e'd' 'b'y' '{ 0 ]
+:str_while_unknown2 [ '$'@'{'}' 'n'o't' 'f'o'l'l'o'w'e'd' 'b'y' '{ 0 ]
+:str_dollar_unknown_cmd [ 'u'n'k'n'o'w'n' 'c'o'm'm'a'n'd':' '$ 0 ]
 
 :heap_start
