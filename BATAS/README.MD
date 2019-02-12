@@ -68,7 +68,7 @@ Unlike DEBUG.EXE, this assembler supports arbitrary backward- and
 forward-referencing labels. You can create a label with LABEL.BAT and further
 use it as a regular batch variable:
 
-    MOV AX [WORD] %Data%
+    CALL MOV AX [WORD] %Data%
     CALL LABEL Test
     CALL JMP %Test%
     CALL LABEL Data
