@@ -46,6 +46,10 @@ string refers to a filename, whose source is included at the point at which
 the directive appears. Note that if the include directive is placed inside a
 text block, the file will still be interpreted as a data block.
 
+In a data block an include directive can be prefixed with `$` to prevent that
+file from being included multiple times. Specifically a directive with `$`
+will not trigger if any directive for that filename appeared before.
+
 Data
 ====
 

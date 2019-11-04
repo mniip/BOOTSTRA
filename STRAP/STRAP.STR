@@ -443,6 +443,34 @@
         $cur_index $/ , 1 + $cur_index $* $:
 }
 
+# A singly linked list of included files, to avoid including a file
+# multiple times, if necessary. Consists of 2 words: next pointer, and
+# pointer to copied string.
+:included [ $0 ]
+# Pops a string and checks if it is in the included list. If it isn't, makes a
+# copy and adds it to the list. Pushes either the made copy and 0, or the
+# existing instance of the string in the list and 1.
+:test_add_included :0 { $;
+        $included $/
+        :included_again
+        @1 $? {
+                @0 @1 2 + $/ strcmp $? {
+                        @1 $/ @=1
+                        @included_again
+                } {
+                        @1 2 + $/ @=0
+                        1 @=1
+                }
+        } {
+                4 alloc
+                $included $/ @2 $*
+                @0 strdup , @=0 @2 2 + $*
+                @2 $included $*
+                0 @=1
+        }
+        $: $:
+}
+
 # Read a data block from the input handle and emit the corresponding code.
 :read_data_block :0 {
         :read_data_block_again
@@ -450,21 +478,22 @@
         @0 0 = @0 '] = | $? { @read_data_block_end } {}
         @0 256 = $? {
                 $token_num $/ emit_byte
+                . @read_data_block_again
+        } {}
+        @0 257 = $? {
+                $token_str find_label emit_byte
+                . @read_data_block_again
+        } {}
+        @0 258 = $? {
+                $token_str test_add_included . include_file
+                . @read_data_block_again
+        } {}
+        @0 '$ = $? {
+                read_data_dollar
         } {
-                @0 257 = $? {
-                        $token_str find_label emit_byte
-                } {
-                        @0 258 = $? {
-                                $token_str include_file
-                        } {
-                                @0 '$ = $? { read_data_dollar } {
-                                        @0 read_common
-                                }
-                        }
-                }
+                @0 read_common
         }
-        .
-        @read_data_block_again
+        . @read_data_block_again
         :read_data_block_end
 }
 
@@ -472,19 +501,28 @@
         read_token 
         @0 256 = $? {
                 $token_num $/ emit_word
-        } {
-                @0 257 = $? {
-                        $token_str find_label emit_word
+                @read_data_dollar_end
+        } {}
+        @0 257 = $? {
+                $token_str find_label emit_word
+                @read_data_dollar_end
+        } {}
+        @0 258 = $? {
+                $token_str test_add_included $? {
+                        .
                 } {
-                        @0 0 = @0 '] = | $? {
-                                put_location
-                                $str_dollar_eob puts
-                                put_nl
-                                exit
-                        } {}
-                        read_common_dollar
+                        include_file
                 }
-        }
+                @read_data_dollar_end
+        } {}
+        @0 0 = @0 '] = | $? {
+                put_location
+                $str_dollar_eob puts
+                put_nl
+                exit
+        } {}
+        read_common_dollar
+        :read_data_dollar_end
 }
 
 # Read a text block from the input handle and emit the corresponding code.
@@ -496,23 +534,24 @@
                 0xB8 emit_byte           # MOV AX,
                 $token_num $/ emit_word  #         $token_num
                 0x50 emit_byte           # PUSH AX
+                . @read_text_block_again
+        } {}
+        @0 257 = $? {
+                0xE8 emit_byte  # CALL <id>
+                $token_str find_label
+                $cur_ip $/ - 2 - emit_word
+                . @read_text_block_again
+        } {}
+        @0 258 = $? {
+                $token_str test_add_included . include_file
+                . @read_text_block_again
+        } {}
+        @0 '$ = $? {
+                read_text_dollar
         } {
-                @0 257 = $? {
-                        0xE8 emit_byte  # CALL <id>
-                        $token_str find_label
-                        $cur_ip $/ - 2 - emit_word
-                } {
-                        @0 258 = $? {
-                                $token_str include_file
-                        } {
-                                @0 '$ = $? { read_text_dollar } {
-                                        @0 read_common
-                                }
-                        }
-                }
+                @0 read_common
         }
-        .
-        @read_text_block_again
+        . @read_text_block_again
         :read_text_block_end
 }
 
@@ -896,7 +935,7 @@
         $cur_line $/
         $cur_column $/
 
-        @0 strdup $in_name_ptr $*
+        @0 $in_name_ptr $*
         process_file
 
         $cur_column $*
@@ -907,6 +946,7 @@
 
 # Open a file from $in_name_ptr, do a single pass, and close the file.
 :process_file :0 {
+        $in_name_ptr $/ test_add_included . .
         $in_name_ptr $/ open_file
         $? { $in_handle $* } { file_error }
         1 $cur_line $*
@@ -958,6 +998,7 @@
         1 $emit_mode $+
         0x100 $cur_ip $*
         0 $cur_index $*
+        0 $included $*
         process_file
 
         $out_handle $/ close_file
