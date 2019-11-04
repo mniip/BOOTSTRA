@@ -1,0 +1,4 @@
+# Terminate the program.
+:exit [
+        0xCD 0x20       # INT 20
+]

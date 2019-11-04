@@ -1,0 +1,9 @@
+$"IO\PUTCHAR.STR"
+
+# Pops a NUL-terminated string and outputs it to standard output.
+:puts :0 { $;
+        $@ { @0 $- } {
+                @0 $- putchar
+                @0 1 + @=0
+        }
+}

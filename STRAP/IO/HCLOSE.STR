@@ -1,0 +1,13 @@
+# Pops file handle, pushes 0 upon success or 1 on error.
+:handle_close [
+        0x5E           # POP SI
+        0x5B           # POP BX
+        0xB4 0x3E      # MOV AH, 0x3E
+        0x33 0xFF      # XOR DI, DI
+        0xCD 0x21      # INT 0x21
+        0x73 0x01      # JNC ok
+        0x47           # INC DI
+        0x57           # ok: PUSH DI
+        0x56           # PUSH SI
+        0xC3           # RET
+]

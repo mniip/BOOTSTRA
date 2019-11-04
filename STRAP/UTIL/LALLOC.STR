@@ -1,0 +1,8 @@
+# This is a simplistic sequential allocator with no way to free memory
+# The memory comes from the area between the executable code (heap_start is
+# defined at the very end of the executable) and the stack.
+# Pops the number of bytes to allocate, pushes address.
+:alloc :0 { $;
+        $heap_ptr $/ @1 @0 + $heap_ptr $* @=0 $:
+}
+:heap_ptr [ $heap_start ]

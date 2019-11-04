@@ -1,0 +1,9 @@
+# Pops a character and outputs it to standard output.
+:putchar [
+        0x5B           # POP BX
+        0x5A           # POP DX
+        0xB4 0x02      # MOV AH, 2
+        0xCD 0x21      # INT 0x21
+        0x53           # PUSH BX
+        0xC3           # RET
+]

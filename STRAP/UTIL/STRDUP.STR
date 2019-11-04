@@ -1,0 +1,11 @@
+$"util\strlen.str"
+$"util\memcpy.str"
+
+# Pops string, pushes copy.
+:strdup :0 { $;
+        , strlen 1 +
+        , alloc
+        ,
+        @0 @1 memcpy
+        @=0 $:
+}

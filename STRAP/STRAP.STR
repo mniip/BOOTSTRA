@@ -1,57 +1,24 @@
 # STRAP compiler in STRAP. 
 # We run over the input file twice: first to calculate the addresses of all
 # labels, second to actually emit all the bytes in a single pass.
-
-@main
-
-# Terminate the program.
-:exit [
-        0xCD 0x20       # INT 20
-]
+"IO\START.STR"
+$"IO\EXIT.STR"
+$"IO\PUTCHAR.STR"
+$"IO\FORMAT.STR"
+$"IO\PUTS.STR"
+$"IO\HCREAT.STR"
+$"IO\HOPEN.STR"
+$"IO\HCLOSE.STR"
+$"IO\HGETC.STR"
+$"IO\HPUTC.STR"
+$"UTIL\STRDUP.STR"
+$"UTIL\STRCMP.STR"
+$"UTIL\LALLOC.STR"
 
 :file_error :0 {
         $str_file_error puts
         put_nl
         exit
-}
-
-# This is a simplistic sequential allocator with no way to free memory
-# The memory comes from the area between the executable code (heap_start is
-# defined at the very end of the executable) and the stack.
-# Pops the number of bytes to allocate, pushes address.
-:alloc :0 { $;
-        $heap_ptr $/ @1 @0 + $heap_ptr $* @=0 $:
-}
-:heap_ptr [ $heap_start ]
-
-# Pops a pointer to a string, pushes a pointer to a copy
-:strdup :0 { $;
-        0
-        $@ { @0 @1 + $- } { @1 1 + @=1 }
-        @1 1 + alloc
-        0 @=1
-        $@ { @0 @1 + $- } {
-                @0 @1 + $- @2 @1 + $+
-                @1 1 + @=1
-        }
-        0 @2 @1 + $+
-        @2 @=0 $:
-}
-
-# Pops two strings and pushes -1, 0, or 1.
-:strcmp :0 { $; $;
-        $@ {
-                @0 $- $? { 1 } { 0 }
-                @1 $- $? { 1 } { 0 } 
-                @0 $- @1 $- = & & 
-        } {
-                @0 1 + @=0
-                @1 1 + @=1
-        }
-        @0 $- @1 $- < $? { 1 ` } {
-                @1 $- @0 $- < $? { 1 } { 0 }
-        }
-        @=0 $:
 }
 
 # Global variables containing file handles for the input and output files.
@@ -68,109 +35,11 @@
 # Current value of the Instruction Pointer. In COM this starts at 0x100.
 :cur_ip [ $0 ]
 
-# Pops filename, pushes file handle and 1 or error and 0.
-:creat_file [
-        0x5B           # POP BX
-        0x5A           # POP DX
-        0x33 0xC9      # XOR CX, CX
-        0xB4 0x3C      # MOV AH, 0x3C
-        0x33 0xFF      # XOR DI, DI
-        0xCD 0x21      # INT 0x21
-        0x72 0x01      # JC error
-        0x47           # INC DI
-        0x50           # error: PUSH AX
-        0x57           # XOR AX, AX
-        0x53           # PUSH BX
-        0xC3           # RET
-]
-
-# Pops filename, pushes file handle and 1 or error and 0.
-:open_file [
-        0x5B           # POP BX
-        0x5A           # POP DX
-        0x32 0xC0      # XOR AL, AL
-        0xB4 0x3D      # MOV AH, 0x3D
-        0x33 0xFF      # XOR DI, DI
-        0xCD 0x21      # INT 0x21
-        0x72 0x01      # JC error
-        0x47           # INC DI
-        0x50           # error: PUSH AX
-        0x57           # PUSH DI
-        0x53           # PUSH BX
-        0xC3           # RET
-]
-
-# Pops file handle, pushes 1 upon success or 0 on error.
-:rewind_file [
-        0x5E           # POP SI
-        0x5B           # POP BX
-        0x32 0xC0      # XOR AL, AL
-        0x33 0xC9      # XOR CX, CX
-        0x33 0xD2      # XOR DX, DX
-        0xB4 0x42      # MOV AH, 0x42
-        0x33 0xFF      # XOR DI, DI
-        0xCD 0x21      # INT 0x21
-        0x72 0x01      # JC error
-        0x47           # INC DI
-        0x57           # error: PUSH DI
-        0x56           # PUSH SI
-        0xC3           # RET
-]
-
-# Pops file handle, pushes 1 upon success or 0 on error.
-:close_file [
-        0x5E           # POP SI
-        0x5B           # POP BX
-        0xB4 0x3E      # MOV AH, 0x3E
-        0x33 0xFF      # XOR DI, DI
-        0xCD 0x21      # INT 0x21
-        0x72 0x01      # JC error
-        0x47           # INC DI
-        0x57           # error: PUSH DI
-        0x56           # PUSH SI
-        0xC3           # RET
-]
-
-# Pops a file handle and a character
-:write_byte [
-        0x5E           # POP SI
-        0x5B           # POP BX
-        0x58           # POP AX
-        0xA2 $buffer   # MOV [buffer], AL
-        0xBA $buffer   # MOV DX, buffer
-        0xB9 0x01 0x00 # MOV CX, 1
-        0xB4 0x40      # MOV AH, 0x40
-        0xCD 0x21      # INT 0x21
-        0x73 0x02      # JNC over
-        @file_error    # jmp file_error
-        0x56           # over: PUSH SI
-        0xC3           # RET
-]
-# Pops a file handle and pushes a character
-:read_byte [
-        0x5E           # POP SI
-        0x5B           # POP BX
-        0x30 0xC0      # XOR AL, AL
-        0xA2 $buffer   # MOV [buffer], AL
-        0xBA $buffer   # MOV DX, buffer
-        0xB9 0x01 0x00 # MOV CX, 1
-        0xB4 0x3F      # MOV AH, 0x3F
-        0xCD 0x21      # INT 0x21
-        0x73 0x02      # JNC over
-        @file_error    # JMP file_error
-        0x30 0xE4      # XOR AH, AH
-        0xA0 $buffer   # MOV AL, [buffer]
-        0x50           # PUSH AX
-        0x56           # PUSH SI
-        0xC3           # RET
-]
-:buffer [ 0 ]
-
 # Pop a byte and emit it (depending on EMIT_MODE). 
 :emit_byte :0 { $;
         $cur_ip $/ 1 + $cur_ip $*
         $emit_mode $-
-        $? { @0 $out_handle $/ write_byte } {}
+        $? { $out_handle $/ @0 handle_putc . } {}
 }
 # Pop a word and emit it
 :emit_word :0 { $;
@@ -194,7 +63,7 @@
                 0 $is_unpeeked $+
                 $unpeeked $-
         } {
-                $in_handle $/ read_byte
+                $in_handle $/ handle_getc
         }
         @0 0x0A = $? {
                 0 $cur_column $*
@@ -947,21 +816,21 @@
 # Open a file from $in_name_ptr, do a single pass, and close the file.
 :process_file :0 {
         $in_name_ptr $/ test_add_included . .
-        $in_name_ptr $/ open_file
-        $? { $in_handle $* } { file_error }
+        $in_name_ptr $/ 0 handle_open
+        $? { file_error } {}
+        $in_handle $*
         1 $cur_line $*
         1 $cur_column $*
         read_data_block
-        $in_handle $/ close_file
-        $? {} { file_error }
+        $in_handle $/ handle_close
+        $? { file_error } {}
 }
 
 :in_name_ptr [ $0 ]
 :out_name_ptr [ $0 ]
 
-:main :0 {
+:main :0 { $;
         # Parse arguments
-        0x81
         $@ { @0 $- '  = } { @0 1 + @=0 }
         @0 $- 0x0D = $? {
                 $str_usage puts
@@ -987,8 +856,9 @@
         }
         0 @0 $+ @0 1 + @=0
         
-        $out_name_ptr $/ creat_file
-        $? { $out_handle $* } { file_error }
+        $out_name_ptr $/ 0 handle_creat
+        $? { file_error } {}
+        $out_handle $* 
 
         0 $emit_mode $+
         0x100 $cur_ip $*
@@ -1001,57 +871,10 @@
         0 $included $*
         process_file
 
-        $out_handle $/ close_file
-        $? {} { file_error }
+        $out_handle $/ handle_close
+        $? { file_error } {}
 
         exit
-}
-
-:putchar [
-        0x5B           # POP BX
-        0x5A           # POP DX
-        0xB4 0x02      # MOV AH, 2
-        0xCD 0x21      # INT 0x21
-        0x53           # PUSH BX
-        0xC3           # RET
-]
-
-:put_nl :0 {
-        0x0A putchar
-        0x0D putchar
-}
-
-:puts :0 { $;
-        $@ { @0 $- } {
-                @0 $- putchar
-                @0 1 + @=0
-        }
-}
-
-:hex_digits [ '0'1'2'3'4'5'6'7'8'9'A'B'C'D'E'F ] 
-
-:put_hex8 :0 { $;
-        '0 putchar
-        'x putchar
-        @0 0x10 / 0x10 % $hex_digits + $- putchar
-        @0 0x10 % $hex_digits + $- putchar
-}
-
-:put_hex16 :0 { $;
-        '0 putchar
-        'x putchar
-        @0 0x1000 / $hex_digits + $- putchar
-        @0 0x100 / 0x10 % $hex_digits + $- putchar
-        @0 0x10 / 0x10 % $hex_digits + $- putchar
-        @0 0x10 % $hex_digits + $- putchar
-}
-
-:put_dec :0 { $;
-        @0 10000 < $? {} { @0 10000 / $hex_digits + $- putchar }
-        @0 1000 < $? {} { @0 1000 / 10 % $hex_digits + $- putchar }
-        @0 100 < $? {} { @0 100 / 10 % $hex_digits + $- putchar }
-        @0 10 < $? {} { @0 10 / 10 % $hex_digits + $- putchar }
-        @0 10 % $hex_digits + $- putchar
 }
 
 :str_counting [ '('c'o'u'n't'i'n'g') 0 ]

@@ -1,0 +1,8 @@
+# Pops a string. Pushes length.
+:strlen :0 { $;
+        ,
+        $@ { @0 $- } {
+                @0 1 + @=0
+        }
+        - $:
+}

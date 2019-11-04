@@ -1,0 +1,19 @@
+$"IO\HREAD.STR"
+
+:handle_getc_buffer [ 0 ]
+
+# Pops a handle, pushes a character, or 0 if an error or eof happened.
+:handle_getc :0 { $;
+        $handle_getc_buffer 1 handle_read
+        $? {
+                . 0
+        } {
+                $? {
+                        $handle_getc_buffer $-
+                } {
+                        0
+                }
+        }
+        $:
+}
+

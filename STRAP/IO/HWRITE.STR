@@ -1,0 +1,17 @@
+# Pops buffer size, buffer pointer, handle. Pushes number of bytes written and 
+# 0, or error and 1.
+:handle_write [
+        0x5E           # POP SI
+        0x59           # POP CX
+        0x5A           # POP DX
+        0x5B           # POP BX
+        0xB4 0x40      # MOV AH, 0x40
+        0x33 0xFF      # XOR DI, DI
+        0xCD 0x21      # INT 0x21
+        0x73 0x01      # JNC ok
+        0x47           # INC DI
+        0x50           # ok: PUSH AX
+        0x57           # PUSH DI
+        0x56           # PUSH SI
+        0xC3           # RET
+]

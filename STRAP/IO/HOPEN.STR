@@ -1,0 +1,18 @@
+# Pops access settings and filename, pushes file handle and 0, or error and 1.
+# Access settings: 0 - read, 1 - write, 2 - read & write.
+:handle_open [
+        0x5B           # POP BX
+        0x58           # POP AX
+        0x5A           # POP DX
+        0x53           # PUSH BX
+        0xB4 0x3D      # MOV AH, 0x3D
+        0x33 0xFF      # XOR DI, DI
+        0xCD 0x21      # INT 0x21
+        0x73 0x01      # JNC ok
+        0x47           # INC DI
+        0x5B           # ok: POP BX
+        0x50           # PUSH AX
+        0x57           # PUSH DI
+        0x53           # PUSH BX
+        0xC3           # RET
+]

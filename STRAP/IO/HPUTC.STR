@@ -1,0 +1,11 @@
+$"IO\HWRITE.STR"
+
+:handle_putc_buffer [ 0 ]
+
+# Pops a character and a handle. Pushes 0 upon success, or 1 on error.
+:handle_putc :0 { $; $;
+        $handle_putc_buffer $+
+        $handle_putc_buffer 1 handle_write
+        @=0 $:
+}
+
