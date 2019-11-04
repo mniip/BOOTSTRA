@@ -38,6 +38,14 @@ Labels
 A `:` followed by an identifier denotes a label, which can be referenced from
 any other location in the program.
 
+Include
+=======
+
+A string surrounded by `"` (double quotes) denotes an include directive. The
+string refers to a filename, whose source is included at the point at which
+the directive appears. Note that if the include directive is placed inside a
+text block, the file will still be interpreted as a data block.
+
 Data
 ====
 
@@ -126,8 +134,8 @@ generated machine code is as follows:
    address.
  * `$+` pops an address and a value and writes the least significant byte of
    the value at that address.
- * `$*` pops an address and pushes a 16-bit word read from that address.
- * `$/` pops an address and a value and and writes the 16-bit word at that
+ * `$/` pops an address and pushes a 16-bit word read from that address.
+ * `$*` pops an address and a value and and writes the 16-bit word at that
    address.
 
 Program

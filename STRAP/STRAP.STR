@@ -278,8 +278,8 @@
 
 # If the token was a number, this is where its numeric value would be stored.
 :token_num [ $0 ]
-# If the token was an identifier, this is where its characters would be 
-# stored. Currently a fixed buffer of 128 bytes.
+# If the token was an identifier or an include directive, this is where its
+# characters would be stored. Currently a fixed buffer of 128 bytes.
 :token_str [
         $0 $0 $0 $0 $0 $0 $0 $0
         $0 $0 $0 $0 $0 $0 $0 $0
@@ -304,6 +304,18 @@
         0 $token_str @1 + $+
 }
 
+# Read an include directive and the trailing " from the input file.
+:read_include :0 {
+        peek
+        0
+        $@ { @0 '" = ` ~ } {
+                @0 $token_str @1 + $+
+                @1 1 + @=1
+                peek @=0
+        }
+        0 $token_str @1 + $+
+}
+
 # Read a token. Pushes the token type which is 256 for numbers, 257 for
 # identifiers, and the ASCII code for single character tokens. Note that we
 # don't process multi-character operators (like '$?') here.
@@ -315,7 +327,7 @@
                 $@ { @0 0 = @0 0x0A = | 1 ^ } { peek @=0 }
                 . @read_token_again
         } {}
-        
+
         @0 is_digit $? {
                 @0 unpeek
                 read_num $token_num $*
@@ -330,7 +342,12 @@
                                 peek
                                 @1 $token_num $*
                                 256 @=0
-                        } {}
+                        } {
+                                @0 '" = $? {
+                                        read_include
+                                        258 @=0
+                                } {}
+                        }
                 }
         }
         $:
@@ -437,8 +454,12 @@
                 @0 257 = $? {
                         $token_str find_label emit_byte
                 } {
-                        @0 '$ = $? { read_data_dollar } {
-                                @0 read_common
+                        @0 258 = $? {
+                                $token_str include_file
+                        } {
+                                @0 '$ = $? { read_data_dollar } {
+                                        @0 read_common
+                                }
                         }
                 }
         }
@@ -481,8 +502,12 @@
                         $token_str find_label
                         $cur_ip $/ - 2 - emit_word
                 } {
-                        @0 '$ = $? { read_text_dollar } {
-                                @0 read_common
+                        @0 258 = $? {
+                                $token_str include_file
+                        } {
+                                @0 '$ = $? { read_text_dollar } {
+                                        @0 read_common
+                                }
                         }
                 }
         }
@@ -865,6 +890,32 @@
         @2 $cur_ip $/ add_ilabel    # :label2
 }
 
+:include_file :0 { $;
+        $in_name_ptr $/
+        $in_handle $/
+        $cur_line $/
+        $cur_column $/
+
+        @0 strdup $in_name_ptr $*
+        process_file
+
+        $cur_column $*
+        $cur_line $*
+        $in_handle $*
+        $in_name_ptr $*
+}
+
+# Open a file from $in_name_ptr, do a single pass, and close the file.
+:process_file :0 {
+        $in_name_ptr $/ open_file
+        $? { $in_handle $* } { file_error }
+        1 $cur_line $*
+        1 $cur_column $*
+        read_data_block
+        $in_handle $/ close_file
+        $? {} { file_error }
+}
+
 :in_name_ptr [ $0 ]
 :out_name_ptr [ $0 ]
 
@@ -898,29 +949,18 @@
         
         $out_name_ptr $/ creat_file
         $? { $out_handle $* } { file_error }
-        $in_name_ptr $/ open_file
-        $? { $in_handle $* } { file_error }
-       
+
         0 $emit_mode $+
-        1 $cur_line $*
-        1 $cur_column $*
         0x100 $cur_ip $*
         0 $cur_index $*
-        read_data_block
-
-        $in_handle $/ rewind_file
-        $? {} { file_error }
+        process_file
 
         1 $emit_mode $+
-        1 $cur_line $*
-        1 $cur_column $*
         0x100 $cur_ip $*
         0 $cur_index $*
-        read_data_block
+        process_file
 
         $out_handle $/ close_file
-        $? {} { file_error }
-        $in_handle $/ close_file
         $? {} { file_error }
 
         exit
