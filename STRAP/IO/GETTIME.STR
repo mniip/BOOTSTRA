@@ -1,0 +1,18 @@
+# Pushes current centiseconds, seconds, minutes and hours
+:gettime [
+        0xB4 0x2C      # MOV AH, 0x2C
+        0xCD 0x21      # INT 0x21
+        0x5B           # POP BX
+        0x32 0xE4      # XOR AH, AH
+        0x8A 0xC2      # MOV AL, DL
+        0x50           # PUSH AX
+        0x8A 0xC6      # MOV AL, DH
+        0x50           # PUSH AX
+        0x8A 0xC1      # MOV AL, CL
+        0x50           # PUSH AX
+        0x8A 0xC5      # MOV AL, CH
+        0x50           # PUSH AX
+        0x53           # PUSH BX
+        0xC3           # RET
+]
+

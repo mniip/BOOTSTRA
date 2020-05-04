@@ -1,0 +1,26 @@
+$"IO\PUTCHAR.STR"
+$"IO\FORMAT.STR"
+$"IO\PUTS.STR"
+
+:dw_put_hex32 :0 { $; $;
+        '0 putchar
+        'x putchar
+        @0 0x1000 / $hex_digits + $- putchar
+        @0 0x100 / 0x10 % $hex_digits + $- putchar
+        @0 0x10 / 0x10 % $hex_digits + $- putchar
+        @0 0x10 % $hex_digits + $- putchar
+        @1 0x1000 / $hex_digits + $- putchar
+        @1 0x100 / 0x10 % $hex_digits + $- putchar
+        @1 0x10 / 0x10 % $hex_digits + $- putchar
+        @1 0x10 % $hex_digits + $- putchar
+}
+
+:dw_put_dec :0 { $; $;
+        @0 @1 dw_div10
+        @2 @3 | $? {
+                dw_put_dec
+        } {
+                . .
+        }
+        dw_mod10 $hex_digits + $- putchar
+}

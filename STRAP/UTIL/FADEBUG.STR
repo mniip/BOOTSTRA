@@ -1,0 +1,41 @@
+$"UTIL\FALLOC.STR"
+$"IO\FORMAT.STR"
+
+:dump_heap :0 {
+        $heap_start
+        $free_list $/
+        0
+        
+        $str_start puts
+        @1 put_hex16
+        put_nl
+
+        :dump_heap_again
+        @0 $heap_end $/ = $? { @dump_heap_end } {} 
+        @2 1 + , @=2 10 = $? { @dump_heap_end } {}
+        @0 @1 = $? {
+                @0 put_hex16
+                '- putchar
+                @0 2 + $/ put_hex16
+                $str_free puts
+                @0 $/ put_hex16
+                put_nl
+
+                @0 $/ @=1
+                @0 2 + $/ @=0
+        } {
+                @0 put_hex16
+                '- putchar
+                @0 $/ put_hex16
+                $str_used puts
+                put_nl
+
+                @0 $/ @=0
+        }
+        @dump_heap_again
+        :dump_heap_end
+}
+
+:str_start [ '-'>'  0 ]
+:str_free [ ' 'f'r'e'e' '-'>'  0 ]
+:str_used [ ' 'u's'e'd 0 ]

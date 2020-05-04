@@ -1,0 +1,114 @@
+# A free list allocator. Minimum allocation size is 1 word. Every free chunk
+# begins with 2 words: pointer to the next free chunk, and pointer to the end
+# of the current chunk. An allocation is headed by a word: a pointer at the 
+# end of the allocation. Memory comes from the area between the executable
+# code and the stack. Allocation finds first fit.
+:free_list [ $0 ]
+:heap_end [ $0 ]
+
+:alloc_init :0 {
+        $heap_end $/ $? {} {
+                0 $heap_start $*
+                0xF000 $heap_start 2 + $*
+                0xF000 $heap_end $*
+                $heap_start $free_list $*
+        }
+}
+
+:alloc :0 { $;
+        alloc_init
+        # Is the requested allocation smaller than a word?
+        , 2 < $? { . 2 } {}
+        2 +
+        $free_list  # @1 = where the address of the current chunk is stored
+        :alloc_again
+        # Is this the end of the free list?
+        @1 $/ $? {} {
+                0 @=0
+                @alloc_end
+        }
+        @1 $/  # @2 = address of the current chunk
+        @2 2 + $/ @2 -  # @3 = size of the current chunk
+        # Is it too small?
+        @3 @0 < $? {
+                . @=1
+                @alloc_again
+        } {}
+        # Is the leftover space too small for a free chunk?
+        @3 @0 - 4 < $? {
+                # Point previous chunk to the next
+                @2 $/ @1 $*
+                # Point the end of the allocation
+                @2 2 + $/ @2 $*
+        } {
+                .
+                @2 @0 +  # @3 = new free chunk
+                @3 @1 $*
+                # Move the free chunk data into the new chunk
+                @2 2 + $/ @3 2 + $*
+                @2 $/ @3 $*
+                # Point the end of the allocation
+                @3 @2 $*
+        }
+        @2 2 + @=0
+        :alloc_end
+        $:
+}
+
+:free :0 { $;
+        # Is the pointer non-null?
+        , $? {} { @free_end }
+        2 -
+        $free_list $/
+        # Is the free list nonempty?
+        , $? {
+                # Does the allocation come before the free list?
+                @0 @1 < $? {} { @free_loop }
+        } {}
+        # Is the end of the allocation the beginning of the free list?
+        @0 $/ @1 = $? {
+                # Move the free list to the allocation
+                @1 $/ @0 $*
+                @1 2 + $/ @0 2 + $*
+        } {
+                # Insert the allocation before the free list
+                @0 $/ @0 2 + $*
+                @1 @0 $*
+        }
+        @0 $free_list $*
+        @free_end
+        :free_loop
+        # Is the end of the current chunk the allocation?
+        @1 2 + $/ @0 = $? {
+                # Is the next chunk the end of the allocation?
+                @1 $/ @0 $/ = $? {
+                        # Copy the next chunk into the current
+                        @1 $/ 2 + $/ @1 2 + $*
+                        @1 $/ $/ @1 $*
+                } {
+                        # Extend the current chunk
+                        @0 $/ @1 2 + $*
+                }
+                @free_end
+        } {}
+        # Is the next chunk the end of the allocation?
+        @1 $/ @0 $/ = $? {
+                # Copy the next chunk into the allocation
+                @1 $/ 2 + $/ @0 2 + $*
+                @1 $/ $/ @0 $*
+                # Update the next pointer
+                @0 @1 $*
+                @free_end
+        } {}
+        # Are there more entries in the list? 
+        @1 $/ $? {
+                # Does the allocation come before the next entry?
+                @0 @1 $/ < $? {} { $/ @free_loop }
+        } {}
+        # Insert the allocation into the list
+        @0 $/ @0 2 + $*
+        @1 $/ @0 $*
+        # Update the next pointer
+        @0 @1 $*
+        :free_end
+}

@@ -1,0 +1,9 @@
+# Pop a function label and call it. It may consume items that lay further
+# down the stack and return values onto it.
+:call [
+        0x58           # POP AX
+        0x89 0xE3      # MOV BX, SP
+        0x87 0x07      # XCHG AX, [BX]
+        0x50           # PUSH AX
+        0xC3           # RET
+]

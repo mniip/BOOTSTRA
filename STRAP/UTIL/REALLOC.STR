@@ -1,0 +1,12 @@
+$"UTIL\MEMCPY.STR"
+
+# Pops new size, old pointer. Pushes new pointer.
+:realloc :0 { $; $;
+        , alloc
+        , $? {} { 0 @=0 @realloc_end }
+        @2 @0 @1 memcpy
+        @0 free
+        @2 @=0
+        :realloc_end
+        $:
+}

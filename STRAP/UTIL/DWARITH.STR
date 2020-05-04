@@ -1,0 +1,139 @@
+# Unsigned Double-Word (DWORD) arithmetic
+# DWORDs are stored with least significant word first, in particular this
+# means that when passed on the stack, the least significant word is on the
+# top of the stack.
+
+:dw_add [
+        0x5E           # POP SI
+        0x58           # POP AX
+        0x59           # POP CX
+        0x5A           # POP DX
+        0x5B           # POP BX
+        0x01 0xD0      # ADD AX, DX
+        0x11 0xD9      # ADC CX, BX
+        0x51           # PUSH CX
+        0x50           # PUSH AX
+        0x56           # PUSH SI
+        0xC3           # RET
+]
+
+:dw_sub [
+        0x5E           # POP SI
+        0x58           # POP AX
+        0x59           # POP CX
+        0x5A           # POP DX
+        0x5B           # POP BX
+        0x29 0xC2      # SUB DX, AX
+        0x19 0xCB      # SBB BX, CX
+        0x53           # PUSH DX
+        0x52           # PUSH BX
+        0x56           # PUSH SI
+        0xC3           # RET
+]
+
+:dw_mul [
+        0x5E           # POP SI
+        0x59           # POP CX
+        0x58           # POP AX
+        0x5B           # POP BX
+        0xF7 0xE3      # MUL BX
+        0x89 0xC7      # MOV DI, AX
+        0x58           # POP AX
+        0xF7 0xE1      # MUL CX
+        0x01 0xC7      # ADD DI, AX
+        0x89 0xC8      # MOV AX, CX
+        0xF7 0xE3      # MUL BX
+        0x01 0xFA      # ADD DX, DI
+        0x52           # PUSH DX
+        0x50           # PUSH AX
+        0x56           # PUSH SI
+        0xC3           # RET
+]
+
+:dw_div10 [
+        0x5E           # POP SI
+        0x59           # POP CX
+        0x58           # POP AX
+        0xBB 0x0A 0x00 # MOV BX, 0x0A
+        0x31 0xD2      # XOR DX, DX
+        0xF7 0xF3      # DIV BX
+        0x50           # PUSH AX
+        0x89 0xC8      # MOV AX, CX
+        0xF7 0xF3      # DIV BX
+        0x50           # PUSH AX
+        0x56           # PUSH SI
+        0xC3           # RET
+]
+
+:dw_mod10 [
+        0x5E           # POP SI
+        0x59           # POP CX
+        0x58           # POP AX
+        0xBB 0x0A 0x00 # MOV BX, 0x0A
+        0x31 0xD2      # XOR DX, DX
+        0xF7 0xF3      # DIV BX
+        0xD1 0xE2      # SHL DX
+        0xD1 0xE2      # SHL DX
+        0x29 0xD1      # SUB CX, DX
+        0x73 0x03      # JNC ok
+        0x83 0xE9 0x06 # SUB CX, 6
+        0x89 0xC8      # MOV AX, CX
+        0x31 0xD2      # XOR DX, DX
+        0xF7 0xF3      # DIV BX
+        0x52           # PUSH DX
+        0x56           # PUSH SI
+        0xC3           # RET
+]
+
+# Pushes back only a single word
+:dw_eq [
+        0x5E           # POP SI
+        0x58           # POP AX
+        0x59           # POP CX
+        0x5A           # POP DX
+        0x5B           # POP BX
+        0x31 0xFF      # XOR DI, DI
+        0x39 0xD0      # CMP AX, DX
+        0x75 0x05      # JNE done
+        0x39 0xD9      # CMP CX, BX
+        0x75 0x01      # JNE done
+        0x47           # INC DI
+        0x57           # PUSH DI
+        0x56           # PUSH SI
+        0xC3           # RET
+]
+
+# Pushes back only a single word
+:dw_lt [
+        0x5E           # POP SI
+        0x58           # POP AX
+        0x59           # POP CX
+        0x5A           # POP DX
+        0x5B           # POP BX
+        0x31 0xFF      # XOR DI, DI
+        0x39 0xD9      # CMP CX, BX
+        0x77 0x06      # JA yes
+        0x72 0x05      # JB no
+        0x39 0xD0      # CMP AX, DX
+        0x76 0x01      # JBE no
+        0x47           # yes: INC DI
+        0x57           # no: PUSH DI
+        0x56           # PUSH SI
+        0xC3           # RET
+]
+
+:dw_read [
+        0x5E           # POP SI
+        0x5B           # POP BX
+        0xFF 0x77 0x02 # PUSH [BX+2]
+        0xFF 0x37      # PUSH [BX]
+        0x56           # PUSH SI
+]
+
+:dw_write [
+        0x5E           # POP SI
+        0x5B           # POP BX
+        0x8F 0x07      # POP [BX]
+        0x8F 0x47 0x02 # POP [BX+2]
+        0x56           # PUSH SI
+]

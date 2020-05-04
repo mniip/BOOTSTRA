@@ -1,0 +1,65 @@
+"IO\START.STR"
+$"IO\GETTIME.STR"
+$"IO\FORMAT.STR"
+
+:time1 [ $0 $0 $0 $0 ]
+:time2 [ $0 $0 $0 $0 ]
+
+:main :0 {
+        gettime
+        $time1 $*
+        $time1 2 + $*
+        $time1 4 + $*
+        $time1 6 + $*
+
+        [
+                0xB8 0xE4 0x0C # MOV AX, 0x0021
+                0xB9 0x46 0xC5 # outer: MOV CX, 0xC546
+                0xE2 0xFE      # inner: LOOP inner
+                0x48           # DEC AX
+                0x75 0xF8      # JNZ outer
+        ]
+
+        gettime
+        $time2 $*
+        $time2 2 + $*
+        $time2 4 + $*
+        $time2 6 + $*
+
+        $time1 $/ put_dec
+        ': putchar
+        $time1 2 + $/ put_dec
+        ': putchar
+        $time1 4 + $/ put_dec
+        '. putchar
+        $time1 6 + $/ put_dec
+        put_nl
+        $time2 $/ put_dec
+        ': putchar
+        $time2 2 + $/ put_dec
+        ': putchar
+        $time2 4 + $/ put_dec
+        '. putchar
+        $time2 6 + $/ put_dec
+        put_nl
+
+        $time2 6 + $/ $time1 6 + $/ - $time1 6 + $*
+        $time2 4 + $/ $time1 4 + $/ - $time1 4 + $*
+        $time2 2 + $/ $time1 2 + $/ - $time1 2 + $*
+        $time2 $/ $time1 $/ - $time1 $*
+
+        $time1 6 + $/ 100 + , 100 % $time1 6 + $* 100 / 1 - 
+        $time1 4 + $/ + 60 + , 60 % $time1 4 + $* 60 / 1 - 
+        $time1 2 + $/ + 60 + , 60 % $time1 2 + $* 60 / 1 - 
+        $time1 $/ + $time1 $*  
+
+        $time1 $/ put_dec
+        ': putchar
+        $time1 2 + $/ put_dec
+        ': putchar
+        $time1 4 + $/ put_dec
+        '. putchar
+        $time1 6 + $/ put_dec
+        put_nl
+}
+

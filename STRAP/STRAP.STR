@@ -14,6 +14,7 @@ $"IO\HPUTC.STR"
 $"UTIL\STRDUP.STR"
 $"UTIL\STRCMP.STR"
 $"UTIL\LALLOC.STR"
+$"UTIL\CHAR.STR"
 
 :file_error :0 {
         $str_file_error puts
@@ -107,42 +108,6 @@ $"UTIL\LALLOC.STR"
         }
         @0 unpeek
         @1 @=0 $:
-}
-
-# Pop a character and push 1 if it's whitespace and 0 otherwise.
-:is_space :0 { $;
-        @0 0x09 =
-        @0 0x0A =
-        @0 0x0D =
-        @0 '  =
-        | | | @=0 $:
-}
-
-:is_ident :0 { $;
-        @0 '_ =
-        @0 '0 < '9 @0 < | 1 ^
-        @0 'a < 'z @0 < | 1 ^
-        @0 'A < 'Z @0 < | 1 ^
-        | | | @=0 $:
-}
-
-:is_digit :0 { $;
-        @0 '0 < '9 @0 < | 1 ^ @=0 $:
-}
-
-:is_hexdigit :0 { $;
-        @0 '0 < '9 @0 < |
-        @0 'a < 'f @0 < |
-        @0 'A < 'F @0 < |
-        & & 1 ^ @=0 $:
-}
-
-# Pop a hexadecimal digit character and push its numeric value.
-:hexdigit :0 { $;
-        @0 '0 < '9 @0 < | $? {
-                @0 'a < 'f @0 < | $? { 'A } { 'a } 0xA -
-        } { '0 }
-        - $:
 }
 
 # If the token was a number, this is where its numeric value would be stored.
@@ -536,6 +501,9 @@ $"UTIL\LALLOC.STR"
         0xF7 0xD0      # NOT AX
 ] :not_arr_end
 
+# The last 2 boolean flags are whether the sequence assumes the top of the
+# stack initially to be in AX, and whether it leaves the top of the stack
+# in AX.
 :char_arrs [
         '% $mod_arr $mod_arr_end 0 0
         '& $and_arr $and_arr_end 1 1
@@ -702,6 +670,9 @@ $"UTIL\LALLOC.STR"
         0x89 0x46 0x02 # MOV [BP+2], AX
 ] :shift_arg_arr_end
 
+# The last 2 boolean flags are whether the sequence assumes the top of the
+# stack initially to be in AX, and whether it leaves the top of the stack
+# in AX.
 :dollar_char_arrs [
         '* $write_word_arr $write_word_arr_end 0 0
         '+ $write_byte_arr $write_byte_arr_end 0 0

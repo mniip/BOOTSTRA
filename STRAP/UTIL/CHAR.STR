@@ -1,0 +1,39 @@
+# Pop a character and push 1 if it's whitespace and 0 otherwise.
+:is_space :0 { $;
+        @0 0x09 =
+        @0 0x0A =
+        @0 0x0D =
+        @0 '  =
+        | | | @=0 $:
+}
+
+# Pop a character and push 1 if it's an alphanumeric or underscore, and 0
+# otherwise.
+:is_ident :0 { $;
+        @0 '_ =
+        @0 '0 < '9 @0 < | 1 ^
+        @0 'a < 'z @0 < | 1 ^
+        @0 'A < 'Z @0 < | 1 ^
+        | | | @=0 $:
+}
+
+# Pop a character and push 1 if it's a decimal digit and 0 otherwise.
+:is_digit :0 { $;
+        @0 '0 < '9 @0 < | 1 ^ @=0 $:
+}
+
+# Pop a character and push 1 if it's a hexadecimal digit and 0 otherwise.
+:is_hexdigit :0 { $;
+        @0 '0 < '9 @0 < |
+        @0 'a < 'f @0 < |
+        @0 'A < 'F @0 < |
+        & & 1 ^ @=0 $:
+}
+
+# Pop a hexadecimal digit character and push its numeric value.
+:hexdigit :0 { $;
+        @0 '0 < '9 @0 < | $? {
+                @0 'a < 'f @0 < | $? { 'A } { 'a } 0xA -
+        } { '0 }
+        - $:
+}

@@ -1,0 +1,27 @@
+# Pops mode, offset, handle.
+# If mode = 0, offset is from the start of file.
+# If mode = 1, offset is from current location (signed word)
+# If mode = 2, offset is from end of file (signed word)
+# Pushes resulting file offset from the start of file (low 16 bits) and 0,
+# or error and 1.
+:handle_seek [
+        0x5E           # POP SI
+        0x58           # POP AX
+        0x5A           # POP DX
+        0x5B           # POP BX
+        0x31 0xC9      # XOR CX, CX
+        0x84 0xC0      # TEST AL, AL
+        0x74 0x05      # JZ noext
+        0x85 0xD2      # TEST DX, DX
+        0x79 0x01      # JNS noext
+        0x49           # DEC CX
+        0xB4 0x42      # MOV AH, 0x42
+        0x33 0xFF      # XOR DI, DI
+        0xCD 0x21      # INT 0x21
+        0x73 0x01      # JNC ok
+        0x47           # INC DI
+        0x50           # ok: PUSH AX
+        0x57           # PUSH DI
+        0x56           # PUSH SI
+        0xC3           # RET
+]
